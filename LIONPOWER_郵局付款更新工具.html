@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>LION POWER 郵局付款更新工具</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0b0907;--panel:#19120d;--gold:#f6b63d;--orange:#ff6a00;--text:#fff6e8;--muted:#c9b59e;--line:rgba(255,166,77,.28)}
+    *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 20% 0,rgba(255,106,0,.18),transparent 38%),var(--bg);color:var(--text);font-family:"Microsoft JhengHei",system-ui,sans-serif;line-height:1.65}
+    main{width:min(820px,calc(100% - 30px));margin:42px auto}.card{background:linear-gradient(145deg,rgba(255,255,255,.055),rgba(255,255,255,.018));border:1px solid var(--line);border-radius:20px;padding:26px;box-shadow:0 25px 70px rgba(0,0,0,.42)}
+    h1{margin:0 0 8px;font-size:clamp(28px,5vw,44px)}h1 span{color:var(--gold)}p{color:var(--muted)}.details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:22px 0}.item{padding:14px;border:1px solid var(--line);border-radius:13px;background:rgba(255,255,255,.025)}.item small{display:block;color:var(--muted)}.item strong{font-size:18px;word-break:break-all}
+    .warning{padding:14px;border-radius:13px;border:1px solid rgba(255,184,70,.35);background:rgba(246,182,61,.08);color:#ffe3ae}.actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:20px}.btn{appearance:none;border:1px solid rgba(255,180,85,.38);border-radius:12px;padding:12px 17px;color:#fff;background:rgba(255,255,255,.05);font-weight:800;cursor:pointer}.btn.primary{border:0;background:linear-gradient(135deg,var(--orange),#bd280c)}.btn:hover{transform:translateY(-1px)}input[type=file]{display:block;width:100%;padding:12px;border:1px dashed var(--line);border-radius:12px;color:var(--muted);margin-top:12px}.status{min-height:28px;margin-top:16px;color:#ffd28a;font-weight:700}.steps{margin-top:24px;padding-top:18px;border-top:1px solid var(--line)}code{color:#ffd28a}.ok{color:#7ce0a4}.error{color:#ff9b89}@media(max-width:600px){.details{grid-template-columns:1fr}.card{padding:20px}}
+  </style>
+</head>
+<body>
+<main>
+  <section class="card">
+    <h1>LION POWER <span>付款資訊更新</span></h1>
+    <p>按一下即可讀取目前網站版本，加入郵局付款說明，並產生可上傳到 GitHub 的新 <code>index.html</code>。</p>
+
+    <div class="details">
+      <div class="item"><small>付款機構</small><strong>中華郵政</strong></div>
+      <div class="item"><small>金融機構代碼</small><strong>700</strong></div>
+      <div class="item"><small>帳戶戶名</small><strong>許敏堅</strong></div>
+      <div class="item"><small>帳號</small><strong>0031084-0354271</strong></div>
+    </div>
+
+    <div class="warning">郵局跨行轉帳代碼為 <strong>700</strong>；007 是第一銀行，因此更新檔不會使用 007。</div>
+
+    <div class="actions">
+      <button class="btn primary" id="autoBtn" type="button">自動產生新版 index.html</button>
+    </div>
+
+    <p>自動讀取失敗時，先從 GitHub 下載目前的 <code>index(25).html</code>，再於下方選取該檔案：</p>
+    <input id="fileInput" type="file" accept=".html,text/html">
+    <button class="btn" id="localBtn" type="button">使用選取檔案產生新版</button>
+    <div class="status" id="status" role="status" aria-live="polite"></div>
+
+    <div class="steps">
+      <strong>產生完成後：</strong>
+      <ol>
+        <li>登入 GitHub，進入 <code>a0958773442-cell/lionpower-shop</code>。</li>
+        <li>上傳工具產生的 <code>index.html</code>，取代原本的同名檔案。</li>
+        <li>按下 Commit changes，等待 GitHub Pages 更新。</li>
+        <li>重新整理 <code>lionpowerbatshop.com/#order</code> 檢查付款區塊。</li>
+      </ol>
+    </div>
+  </section>
+</main>
+<script>
+const RAW_URL = 'https://raw.githubusercontent.com/a0958773442-cell/lionpower-shop/main/index%2825%29.html';
+const statusEl = document.getElementById('status');
+
+const paymentCSS = `
+
+    /* LION POWER 郵局付款說明 */
+    .payment-info{
+      margin-top:16px;
+      padding:18px;
+      border-radius:15px;
+      color:#f8e7d2;
+      background:linear-gradient(145deg,rgba(246,182,61,.11),rgba(255,106,0,.055));
+      border:1px solid rgba(246,182,61,.38);
+      box-shadow:0 14px 34px rgba(0,0,0,.24);
+    }
+    .payment-info .payment-kicker{
+      color:#f6b63d;
+      font-size:12px;
+      font-weight:900;
+      letter-spacing:.18em;
+    }
+    .payment-info h4{
+      margin:4px 0 13px;
+      color:#fff4df;
+      font-size:19px;
+    }
+    .payment-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px 12px;
+      margin:0 0 13px;
+    }
+    .payment-row{
+      padding:9px 10px;
+      border-radius:10px;
+      background:rgba(0,0,0,.18);
+      border:1px solid rgba(255,255,255,.07);
+    }
+    .payment-row small{display:block;color:#cbb59d;font-size:11px}
+    .payment-row strong{display:block;color:#fff;font-size:14px;word-break:break-all}
+    .payment-copy-btn{
+      width:100%;
+      margin-top:2px;
+      padding:10px 12px;
+      border:1px solid rgba(255,176,67,.42);
+      border-radius:10px;
+      color:#fff;
+      background:linear-gradient(135deg,#c66d00,#8f2b08);
+      font-weight:900;
+      cursor:pointer;
+    }
+    .payment-note{
+      margin:11px 0 0;
+      color:#d8c3aa;
+      font-size:12px;
+      line-height:1.6;
+    }
+    @media(max-width:520px){.payment-grid{grid-template-columns:1fr}}
+`;
+
+const paymentHTML = `
+            <div class="payment-info" id="postalPaymentInfo">
+              <div class="payment-kicker">PAYMENT INFORMATION</div>
+              <h4>郵局轉帳付款</h4>
+              <div class="payment-grid">
+                <div class="payment-row"><small>金融機構</small><strong>中華郵政</strong></div>
+                <div class="payment-row"><small>金融機構代碼</small><strong>700</strong></div>
+                <div class="payment-row"><small>帳戶戶名</small><strong>許敏堅</strong></div>
+                <div class="payment-row"><small>轉帳帳號</small><strong>00310840354271</strong></div>
+              </div>
+              <button class="payment-copy-btn" type="button"
+                onclick="navigator.clipboard.writeText('00310840354271').then(()=&gt;{const old=this.textContent;this.textContent='帳號已複製';setTimeout(()=&gt;this.textContent=old,1800)}).catch(()=&gt;alert('請複製帳號：00310840354271'))">
+                複製郵局帳號
+              </button>
+              <p class="payment-note">
+                帳號亦可辨識為 0031084-0354271。付款完成後，請透過 LINE 或 Email 提供訂購姓名、匯款金額及帳號末五碼，以便核對款項。
+              </p>
+            </div>`;
+
+function patchSource(source){
+  if(!source.includes('<!doctype html') && !source.includes('<html')) throw new Error('選取的檔案不是有效的 HTML 網頁。');
+  let out = source;
+  // 移除舊版付款區塊與樣式，避免重複。
+  out = out.replace(/\n\s*\/\* LION POWER 郵局付款說明 \*\/[\s\S]*?(?=\n\s*<\/style>)/, '');
+  out = out.replace(/\n\s*<div class="payment-info" id="postalPaymentInfo">[\s\S]*?<\/div>\s*(?=<\/aside>)/, '');
+
+  if(!out.includes('</style>')) throw new Error('找不到網站樣式結束位置。');
+  out = out.replace('</style>', paymentCSS + '\n  </style>');
+
+  const emailBlock = /(<p class="email-destination">[\s\S]*?<\/p>)/;
+  if(emailBlock.test(out)){
+    out = out.replace(emailBlock, '$1\n' + paymentHTML);
+  }else{
+    const asideEnd = '</aside>';
+    if(!out.includes(asideEnd)) throw new Error('找不到訂購資訊區塊。');
+    out = out.replace(asideEnd, paymentHTML + '\n          </aside>');
+  }
+  return out;
+}
+
+function downloadHTML(text){
+  const blob = new Blob([text],{type:'text/html;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url;a.download='index.html';document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+}
+
+async function autoBuild(){
+  statusEl.className='status';statusEl.textContent='正在讀取目前網站原始檔…';
+  try{
+    const res=await fetch(RAW_URL,{cache:'no-store'});
+    if(!res.ok) throw new Error('下載失敗：HTTP '+res.status);
+    const source=await res.text();
+    const patched=patchSource(source);
+    downloadHTML(patched);
+    statusEl.className='status ok';statusEl.textContent='完成：已下載新版 index.html。';
+  }catch(err){
+    statusEl.className='status error';statusEl.textContent='自動讀取失敗：'+err.message+'。請改用下方選取本機 HTML 檔案。';
+  }
+}
+
+async function localBuild(){
+  const file=document.getElementById('fileInput').files[0];
+  if(!file){statusEl.className='status error';statusEl.textContent='請先選取目前網站的 HTML 檔案。';return;}
+  try{
+    statusEl.className='status';statusEl.textContent='正在處理檔案…';
+    const source=await file.text();
+    const patched=patchSource(source);
+    downloadHTML(patched);
+    statusEl.className='status ok';statusEl.textContent='完成：已下載新版 index.html。';
+  }catch(err){statusEl.className='status error';statusEl.textContent='處理失敗：'+err.message;}
+}
+
+document.getElementById('autoBtn').addEventListener('click',autoBuild);
+document.getElementById('localBtn').addEventListener('click',localBuild);
+</script>
+</body>
+</html>
